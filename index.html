@@ -1,0 +1,1640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HistoAI — WSI Analysis Platform</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔬</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:         #0a0c10;
+      --bg-surface: #0f1318;
+      --bg-card:    #141820;
+      --bg-hover:   #1a2030;
+      --border:     rgba(255,255,255,0.07);
+      --border-md:  rgba(255,255,255,0.12);
+      --accent:     #00e5a0;
+      --accent-dim: rgba(0,229,160,0.10);
+      --accent-glow:rgba(0,229,160,0.30);
+      --mal:        #ff4d6d;
+      --mal-dim:    rgba(255,77,109,0.12);
+      --warn:       #f59e0b;
+      --info:       #60a5fa;
+      --text-1:     #f0f4ff;
+      --text-2:     #8892a4;
+      --text-3:     #525f74;
+      --font-sans:  'Space Grotesk', sans-serif;
+      --font-mono:  'JetBrains Mono', monospace;
+      --font-serif: 'Instrument Serif', serif;
+      --r-sm: 6px; --r: 12px; --r-lg: 18px;
+      --t: 0.18s cubic-bezier(.4,0,.2,1);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg); color: var(--text-1);
+      line-height: 1.6; min-height: 100vh; overflow-x: hidden;
+    }
+    button { cursor: pointer; font-family: inherit; border: none; outline: none; }
+    a { color: inherit; text-decoration: none; }
+
+    /* ── LAYOUT ─────────────────────────────────────────── */
+    .app { display: flex; min-height: 100vh; }
+
+    .sidebar {
+      width: 230px; min-width: 230px;
+      background: var(--bg-surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      position: fixed; top: 0; left: 0; bottom: 0; z-index: 100;
+      transition: transform var(--t);
+    }
+    .sidebar-logo {
+      padding: 22px 18px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .logo-icon {
+      width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--accent) 0%, #0095ff 100%);
+      display: flex; align-items: center; justify-content: center; font-size: 17px;
+    }
+    .logo-name { font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
+    .logo-name span { color: var(--accent); }
+    .logo-tag { font-size: 9.5px; color: var(--text-3); margin-top: 1px; letter-spacing: 0.08em; text-transform: uppercase; }
+
+    .sidebar-nav { flex: 1; padding: 14px 8px; display: flex; flex-direction: column; gap: 1px; overflow-y: auto; }
+    .nav-group-label {
+      font-size: 9.5px; font-weight: 700; color: var(--text-3);
+      letter-spacing: 0.12em; text-transform: uppercase;
+      padding: 10px 10px 5px;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 9px;
+      padding: 8px 11px; border-radius: var(--r-sm);
+      font-size: 13px; font-weight: 500; color: var(--text-2);
+      transition: var(--t); cursor: pointer; user-select: none;
+    }
+    .nav-item:hover { background: var(--bg-hover); color: var(--text-1); }
+    .nav-item.active {
+      background: var(--accent-dim); color: var(--accent);
+      border: 1px solid rgba(0,229,160,0.18);
+    }
+    .nav-item .ni { font-size: 15px; width: 19px; text-align: center; flex-shrink: 0; }
+    .nav-badge {
+      margin-left: auto; background: var(--accent); color: #000;
+      font-size: 9px; font-weight: 800; padding: 1px 6px; border-radius: 99px;
+    }
+
+    .sidebar-footer {
+      padding: 14px; border-top: 1px solid var(--border);
+    }
+    .model-chip {
+      padding: 9px 11px; background: var(--bg-card);
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .model-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: blink 2s ease infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .model-name { font-size: 11.5px; font-weight: 600; color: var(--text-1); }
+    .model-auc  { font-size: 10.5px; color: var(--text-3); }
+
+    .main { margin-left: 230px; flex: 1; display: flex; flex-direction: column; }
+
+    .topbar {
+      height: 55px; background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 26px; position: sticky; top: 0; z-index: 50;
+    }
+    .breadcrumb { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text-3); }
+    .breadcrumb b { color: var(--text-1); font-weight: 500; }
+    .topbar-actions { display: flex; align-items: center; gap: 10px; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 15px; border-radius: var(--r-sm);
+      font-size: 12.5px; font-weight: 600; transition: var(--t);
+    }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-primary:hover { filter: brightness(1.12); box-shadow: 0 0 18px var(--accent-glow); }
+    .btn-ghost { background: transparent; color: var(--text-2); border: 1px solid var(--border-md); }
+    .btn-ghost:hover { background: var(--bg-hover); color: var(--text-1); }
+    .btn-sm { padding: 5px 11px; font-size: 11.5px; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .content { flex: 1; padding: 26px; }
+    .page { animation: fadeIn .22s ease; }
+    .page.hidden { display: none !important; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+
+    /* ── UPLOAD ─────────────────────────────────────────── */
+    .drop-zone {
+      border: 2px dashed var(--border-md);
+      border-radius: var(--r-lg); padding: 52px 36px;
+      text-align: center; cursor: pointer; transition: var(--t);
+      position: relative; overflow: hidden;
+    }
+    .drop-zone:hover, .drop-zone.over {
+      border-color: var(--accent); background: var(--accent-dim);
+    }
+    .drop-zone::before {
+      content: ''; position: absolute; inset: 0;
+      background: radial-gradient(ellipse at 50% 0%, rgba(0,229,160,.05) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .drop-icon { font-size: 44px; margin-bottom: 14px; }
+    .drop-title { font-size: 19px; font-weight: 700; margin-bottom: 7px; }
+    .drop-sub { font-size: 13px; color: var(--text-2); margin-bottom: 18px; }
+    .format-row { display: flex; justify-content: center; gap: 7px; flex-wrap: wrap; }
+    .fmt { font-family: var(--font-mono); font-size: 10.5px; padding: 2px 9px; border-radius: 4px; background: var(--bg-card); border: 1px solid var(--border-md); color: var(--text-2); }
+
+    .config-row { display: flex; gap: 10px; margin-top: 14px; }
+    .field {
+      flex: 1; background: var(--bg-card); border: 1px solid var(--border-md);
+      border-radius: var(--r-sm); color: var(--text-1);
+      font-family: var(--font-mono); font-size: 12px;
+      padding: 8px 12px; outline: none; transition: var(--t);
+    }
+    .field:focus { border-color: var(--accent); }
+    .field::placeholder { color: var(--text-3); }
+
+    .info-bar {
+      margin-top: 13px; padding: 10px 15px;
+      background: rgba(96,165,250,.08); border: 1px solid rgba(96,165,250,.2);
+      border-radius: var(--r-sm); font-size: 12.5px; color: var(--info);
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    /* ── PIPELINE TRACKER ───────────────────────────────── */
+    .pipeline-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--r-lg); padding: 22px; margin-top: 22px;
+    }
+    .pipeline-hdr {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;
+    }
+    .pipeline-title { font-size: 14.5px; font-weight: 700; }
+    .pipeline-file  { font-size: 11.5px; color: var(--text-3); margin-top: 2px; font-family: var(--font-mono); }
+
+    .prog-wrap { height: 3px; background: var(--bg-hover); border-radius: 2px; margin-bottom: 16px; overflow: hidden; }
+    .prog-fill  { height: 100%; border-radius: 2px; background: linear-gradient(90deg, var(--accent), #0095ff); transition: width .5s ease; }
+
+    .steps-list { display: flex; flex-direction: column; }
+    .step-row {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .step-row:last-child { border-bottom: none; }
+    .step-dot {
+      width: 26px; height: 26px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 2px;
+    }
+    .step-dot.pending  { background: var(--bg-hover); color: var(--text-3); border: 1px solid var(--border-md); }
+    .step-dot.running  { background: var(--accent-dim); border: 2px solid var(--accent); color: var(--accent); animation: spin-ring 1.2s ease infinite; }
+    .step-dot.done     { background: var(--accent); color: #000; }
+    .step-dot.error    { background: var(--mal-dim); color: var(--mal); border: 1px solid var(--mal); }
+    @keyframes spin-ring { 0%{box-shadow:0 0 0 0 var(--accent-glow)} 70%{box-shadow:0 0 0 7px transparent} 100%{box-shadow:0 0 0 0 transparent} }
+
+    .step-body { flex: 1; min-width: 0; }
+    .step-name { font-size: 12.5px; font-weight: 600; }
+    .step-desc { font-size: 11px; color: var(--text-3); }
+    .step-log  { margin-top: 5px; font-family: var(--font-mono); font-size: 10.5px; color: var(--accent); background: rgba(0,229,160,.05); border-left: 2px solid var(--accent); padding: 3px 9px; border-radius: 0 3px 3px 0; }
+    .step-dur  { font-size: 10.5px; color: var(--text-3); font-family: var(--font-mono); white-space: nowrap; margin-top: 4px; }
+
+    .terminal {
+      margin-top: 14px; background: #040609; border: 1px solid var(--border);
+      border-radius: var(--r-sm); padding: 14px;
+      font-family: var(--font-mono); font-size: 11px; line-height: 1.75;
+      max-height: 260px; overflow-y: auto; color: #cdd6f4;
+    }
+    .tl-ts  { color: var(--text-3); }
+    .tl-ok  { color: var(--accent); }
+    .tl-err { color: var(--mal); }
+    .tl-inf { color: var(--info); }
+
+    /* ── CARDS / GRID ────────────────────────────────────── */
+    .grid-2  { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .grid-3  { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+    .grid-4  { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+    .grid-auto { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px,1fr)); gap: 12px; }
+
+    .card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--r-lg); overflow: hidden;
+    }
+    .card-hdr {
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .card-title { font-size: 13px; font-weight: 700; }
+    .card-sub   { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+    .card-body  { padding: 16px 18px; }
+
+    .stat-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 15px 17px; transition: var(--t);
+    }
+    .stat-card:hover { border-color: var(--border-md); }
+    .stat-label { font-size: 10.5px; color: var(--text-3); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 7px; }
+    .stat-value { font-size: 24px; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+    .stat-unit  { font-size: 12.5px; color: var(--text-2); margin-left: 3px; }
+    .stat-sub   { font-size: 11px; color: var(--text-3); margin-top: 5px; }
+
+    /* ── DIAGNOSIS HERO ─────────────────────────────────── */
+    .diag-hero {
+      border-radius: var(--r-lg); padding: 26px 30px;
+      display: flex; align-items: center; justify-content: space-between; gap: 20px;
+      margin-bottom: 20px; border: 1px solid; position: relative; overflow: hidden;
+    }
+    .diag-hero.mal { background: linear-gradient(135deg,rgba(255,77,109,.10),rgba(255,77,109,.03)); border-color: rgba(255,77,109,.35); }
+    .diag-hero.ben { background: linear-gradient(135deg,rgba(0,229,160,.10),rgba(0,229,160,.03)); border-color: rgba(0,229,160,.30); }
+    .diag-label   { font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; opacity: .6; margin-bottom: 5px; }
+    .diag-verdict { font-family: var(--font-serif); font-size: 34px; font-weight: 400; line-height: 1.1; }
+    .diag-detail  { font-size: 12.5px; color: var(--text-2); margin-top: 4px; }
+
+    .ring-wrap { display: flex; align-items: center; gap: 18px; }
+    .ring { position: relative; width: 82px; height: 82px; flex-shrink: 0; }
+    .ring svg { transform: rotate(-90deg); }
+    .ring-inner { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .ring-pct { font-size: 18px; font-weight: 800; line-height: 1; }
+    .ring-lab { font-size: 8.5px; color: var(--text-3); font-weight: 700; letter-spacing: .06em; }
+
+    .fold-bars { display: flex; gap: 4px; align-items: flex-end; }
+    .fb { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    .fb-bar { width: 22px; border-radius: 3px 3px 0 0; min-height: 4px; transition: var(--t); }
+    .fb-lbl { font-size: 8.5px; color: var(--text-3); font-family: var(--font-mono); }
+
+    /* ── TABS ───────────────────────────────────────────── */
+    .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+    .tab { padding: 9px 18px; font-size: 12.5px; font-weight: 600; color: var(--text-3); border-bottom: 2px solid transparent; cursor: pointer; transition: var(--t); margin-bottom: -1px; }
+    .tab:hover { color: var(--text-1); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* ── VISUALIZATIONS ─────────────────────────────────── */
+    .canvas-box {
+      aspect-ratio: 4/3; border-radius: var(--r-sm); overflow: hidden;
+      background: var(--bg-hover); position: relative;
+    }
+    .canvas-box canvas { width: 100%; height: 100%; display: block; }
+
+    .heat-legend { display: flex; align-items: center; gap: 8px; margin-top: 9px; }
+    .heat-bar { flex: 1; height: 7px; border-radius: 4px; background: linear-gradient(90deg,#2b83ba,#abdda4,#ffffbf,#fdae61,#d7191c); }
+    .heat-lbl { font-size: 9.5px; color: var(--text-3); }
+
+    .tissue-row { display: flex; align-items: center; gap: 9px; padding: 4px 0; }
+    .t-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .t-name { font-size: 12px; flex: 1; }
+    .t-track { width: 76px; height: 5px; background: var(--bg-hover); border-radius: 3px; overflow: hidden; }
+    .t-fill  { height: 100%; border-radius: 3px; }
+    .t-pct   { font-size: 11px; color: var(--text-2); font-family: var(--font-mono); width: 34px; text-align: right; }
+
+    .morph-row { margin-bottom: 13px; }
+    .morph-hdr { display: flex; justify-content: space-between; margin-bottom: 4px; }
+    .morph-name { font-size: 12px; }
+    .morph-val  { font-size: 11.5px; font-family: var(--font-mono); color: var(--text-2); }
+    .morph-track{ height: 6px; background: var(--bg-hover); border-radius: 3px; overflow: hidden; }
+    .morph-fill { height: 100%; border-radius: 3px; }
+    .morph-desc { font-size: 10.5px; color: var(--text-3); margin-top: 3px; }
+
+    .spatial-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .sp-cell { background: var(--bg-hover); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 12px; }
+    .sp-label { font-size: 10px; color: var(--text-3); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 5px; }
+    .sp-value { font-size: 15px; font-weight: 700; }
+    .sp-sub   { font-size: 10.5px; color: var(--text-3); margin-top: 2px; }
+
+    /* ── HISTORY TABLE ──────────────────────────────────── */
+    .tbl { width: 100%; border-collapse: collapse; }
+    .tbl th { text-align: left; font-size: 10px; font-weight: 700; color: var(--text-3); letter-spacing: .1em; text-transform: uppercase; padding: 7px 13px; border-bottom: 1px solid var(--border-md); white-space: nowrap; }
+    .tbl td { padding: 11px 13px; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+    .tbl tr:last-child td { border-bottom: none; }
+    .tbl tr:hover td { background: var(--bg-hover); }
+
+    .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 99px; font-size: 11px; font-weight: 700; }
+    .badge-mal { background: var(--mal-dim); color: var(--mal); border: 1px solid rgba(255,77,109,.25); }
+    .badge-ben { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(0,229,160,.22); }
+    .badge-run { background: rgba(96,165,250,.1); color: var(--info); border: 1px solid rgba(96,165,250,.22); }
+    .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+    /* ── SETTINGS ───────────────────────────────────────── */
+    .settings-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 22px; margin-bottom: 14px; }
+    .settings-title { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+    .settings-sub   { font-size: 12px; color: var(--text-3); margin-bottom: 18px; }
+    .field-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .field-row:last-child { border-bottom: none; }
+    .field-label { font-size: 12.5px; font-weight: 500; }
+    .field-desc  { font-size: 11.5px; color: var(--text-3); margin-top: 1px; }
+    .field-input { background: var(--bg-hover); border: 1px solid var(--border-md); border-radius: var(--r-sm); color: var(--text-1); font-family: var(--font-mono); font-size: 12px; padding: 6px 11px; width: 130px; outline: none; transition: var(--t); }
+    .field-input:focus { border-color: var(--accent); }
+    .toggle { width: 38px; height: 21px; background: var(--bg-hover); border-radius: 11px; border: 1px solid var(--border-md); cursor: pointer; position: relative; transition: var(--t); flex-shrink: 0; }
+    .toggle.on { background: var(--accent); border-color: var(--accent); }
+    .toggle::after { content:''; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px; border-radius: 50%; background: white; transition: var(--t); }
+    .toggle.on::after { left: calc(100% - 17px); }
+
+    /* ── SECTION LABEL ──────────────────────────────────── */
+    .sec-label { font-size: 10px; font-weight: 700; color: var(--text-3); letter-spacing: .12em; text-transform: uppercase; margin-bottom: 12px; }
+
+    /* ── EMPTY STATE ────────────────────────────────────── */
+    .empty { text-align: center; padding: 72px 36px; color: var(--text-3); }
+    .empty-icon  { font-size: 44px; margin-bottom: 14px; }
+    .empty-title { font-size: 16px; font-weight: 700; color: var(--text-2); margin-bottom: 7px; }
+    .empty-sub   { font-size: 13px; max-width: 320px; margin: 0 auto 22px; }
+
+    /* ── TOAST ──────────────────────────────────────────── */
+    .toast-wrap { position: fixed; bottom: 22px; right: 22px; display: flex; flex-direction: column; gap: 7px; z-index: 9999; }
+    .toast { background: var(--bg-card); border: 1px solid var(--border-md); border-radius: var(--r); padding: 11px 16px; display: flex; align-items: center; gap: 9px; box-shadow: 0 8px 28px rgba(0,0,0,.45); animation: slideUp .25s ease; font-size: 12.5px; min-width: 240px; }
+    .toast.ok  { border-color: rgba(0,229,160,.35); }
+    .toast.err { border-color: rgba(255,77,109,.35); }
+    @keyframes slideUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
+
+    /* ── CLUSTER ────────────────────────────────────────── */
+    .cluster-legend { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+    .cl-chip { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-2); }
+    .cl-dot  { width: 8px; height: 8px; border-radius: 50%; }
+
+    /* ── API PAGE ───────────────────────────────────────── */
+    .endpoint-row { display: grid; grid-template-columns: 90px 220px 1fr; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border); }
+    .endpoint-row:last-child { border-bottom: none; }
+    .method { font-size: 10px; font-weight: 800; letter-spacing: .05em; padding: 2px 8px; border-radius: 4px; font-family: var(--font-mono); text-align: center; }
+    .method-post { background: rgba(0,229,160,.13); color: var(--accent); }
+    .method-get  { background: rgba(96,165,250,.12); color: var(--info); }
+    .method-del  { background: rgba(255,77,109,.12); color: var(--mal); }
+    .ep-path { font-family: var(--font-mono); font-size: 11.5px; }
+    .ep-desc { font-size: 12px; color: var(--text-2); }
+
+    /* ── SCROLLBAR ──────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border-md); border-radius: 3px; }
+
+    /* ── MOBILE ─────────────────────────────────────────── */
+    @media(max-width:768px) {
+      .sidebar { transform: translateX(-100%); }
+      .sidebar.open { transform: none; }
+      .main { margin-left: 0; }
+      .grid-2,.grid-3,.grid-4 { grid-template-columns: 1fr; }
+      .spatial-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+<!-- ═══ SIDEBAR ════════════════════════════════════════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">🔬</div>
+    <div>
+      <div class="logo-name">Histo<span>AI</span></div>
+      <div class="logo-tag">WSI Analysis Platform</div>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-group-label">Analysis</div>
+    <div class="nav-item active" onclick="nav('upload')"><span class="ni">📤</span>Upload &amp; Analyze</div>
+    <div class="nav-item" onclick="nav('results')">
+      <span class="ni">🧬</span>Results
+      <span class="nav-badge hidden" id="results-badge">1</span>
+    </div>
+    <div class="nav-item" onclick="nav('history')"><span class="ni">📋</span>History</div>
+
+    <div class="nav-group-label" style="margin-top:6px;">Explore</div>
+    <div class="nav-item" onclick="nav('heatmap')"><span class="ni">🗺️</span>Heatmap Viewer</div>
+    <div class="nav-item" onclick="nav('cluster')"><span class="ni">🔵</span>Cluster Explorer</div>
+    <div class="nav-item" onclick="nav('report')"><span class="ni">📄</span>PDF Report</div>
+
+    <div class="nav-group-label" style="margin-top:6px;">System</div>
+    <div class="nav-item" onclick="nav('settings')"><span class="ni">⚙️</span>Settings</div>
+    <div class="nav-item" onclick="nav('api')"><span class="ni">🔌</span>API Docs</div>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="model-chip">
+      <div class="model-dot"></div>
+      <div>
+        <div class="model-name">CONCH v1.5 + TITAN</div>
+        <div class="model-auc">CV-AUC 0.9727 · thr 0.30</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- ═══ MAIN ════════════════════════════════════════════════ -->
+<main class="main">
+  <header class="topbar">
+    <div class="breadcrumb">
+      HistoAI <span style="color:var(--text-3);margin:0 3px;">›</span>
+      <b id="bc-label">Upload &amp; Analyze</b>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-ghost btn-sm" onclick="nav('api')">API</button>
+      <button class="btn btn-ghost btn-sm" id="api-status-btn" onclick="checkAPIConn()" title="API connection status">● Offline</button>
+      <button class="btn btn-primary btn-sm" onclick="nav('upload')">+ New Analysis</button>
+    </div>
+  </header>
+
+  <div class="content" id="content">
+
+    <!-- ══ UPLOAD ══════════════════════════════════════════ -->
+    <div id="pg-upload" class="page">
+      <div class="drop-zone" id="drop-zone"
+           ondragover="doDragOver(event)" ondragleave="doDragLeave(event)" ondrop="doDrop(event)"
+           onclick="document.getElementById('fi').click()">
+        <input type="file" id="fi" style="display:none" accept=".svs,.ndpi,.mrxs,.tiff,.tif,.scn,.vms,.bif" onchange="onFileSelect(event)" />
+        <div class="drop-icon">🔬</div>
+        <div class="drop-title">Drop your WSI file here</div>
+        <div class="drop-sub">Whole Slide Image scanned at 0.5 MPP · CONCH v1.5 448px patches</div>
+        <div class="format-row">
+          <span class="fmt">.svs</span><span class="fmt">.ndpi</span><span class="fmt">.mrxs</span>
+          <span class="fmt">.tiff</span><span class="fmt">.scn</span><span class="fmt">.vms</span>
+        </div>
+      </div>
+
+      <div class="config-row">
+        <input class="field" type="password" id="hf-token" placeholder="🤗 HuggingFace token (MahmoodLab/conchv1_5 + TITAN)" />
+        <input class="field" type="text" id="clf-path" value="/models/bracs_v3_model.pkl" placeholder="Classifier .pkl path" style="flex:.8;" />
+      </div>
+      <div class="config-row" style="margin-top:8px;">
+        <input class="field" id="api-url" value="" placeholder="API base URL — e.g. https://histoai.your-server.com" />
+        <button class="btn btn-ghost" onclick="saveAPIURL()">Save URL</button>
+        <button class="btn btn-primary" id="run-btn" onclick="startAnalysis()">▶ Run Analysis</button>
+      </div>
+
+      <div class="info-bar">
+        ℹ️ <span>
+          <b>Demo mode</b>: click ▶ Run Analysis to simulate the pipeline.
+          For real WSI analysis, deploy the <code style="background:rgba(255,255,255,.08);padding:1px 6px;border-radius:3px;font-family:var(--font-mono)">backend/</code> FastAPI server and enter its URL above.
+        </span>
+      </div>
+
+      <div class="pipeline-card hidden" id="pipeline-card">
+        <div class="pipeline-hdr">
+          <div>
+            <div class="pipeline-title">Pipeline Execution</div>
+            <div class="pipeline-file" id="pl-file">—</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="cancelRun()">✕ Cancel</button>
+        </div>
+        <div class="prog-wrap"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+        <div class="steps-list" id="steps-list"></div>
+        <div class="terminal" id="terminal"></div>
+      </div>
+    </div>
+
+    <!-- ══ RESULTS ═════════════════════════════════════════ -->
+    <div id="pg-results" class="page hidden">
+      <div class="empty hidden" id="res-empty">
+        <div class="empty-icon">🧬</div>
+        <div class="empty-title">No analysis yet</div>
+        <div class="empty-sub">Upload a WSI and run the pipeline to see results here.</div>
+        <button class="btn btn-primary" onclick="nav('upload')">Upload a slide</button>
+      </div>
+      <div id="res-body" class="hidden">
+        <div id="diag-hero" class="diag-hero"></div>
+        <div class="sec-label" style="margin-top:4px;">Overview</div>
+        <div class="grid-auto" id="stats-grid" style="margin-bottom:20px;"></div>
+        <div class="tabs" id="res-tabs">
+          <div class="tab active" onclick="switchTab('spatial')">Spatial</div>
+          <div class="tab" onclick="switchTab('tissue')">Tissue</div>
+          <div class="tab" onclick="switchTab('morphology')">Morphology</div>
+          <div class="tab" onclick="switchTab('folds')">Fold Detail</div>
+        </div>
+        <div id="tab-spatial"></div>
+        <div id="tab-tissue" class="hidden"></div>
+        <div id="tab-morphology" class="hidden"></div>
+        <div id="tab-folds" class="hidden"></div>
+      </div>
+    </div>
+
+    <!-- ══ HEATMAP ═════════════════════════════════════════ -->
+    <div id="pg-heatmap" class="page hidden">
+      <div class="empty" id="hm-empty">
+        <div class="empty-icon">🗺️</div>
+        <div class="empty-title">No heatmap available</div>
+        <div class="empty-sub">Run an analysis first.</div>
+        <button class="btn btn-primary" onclick="nav('upload')">Upload a slide</button>
+      </div>
+      <div id="hm-body" class="hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+          <div>
+            <div style="font-size:17px;font-weight:700;" id="hm-title">—</div>
+            <div style="font-size:12.5px;color:var(--text-3);margin-top:2px;" id="hm-sub">—</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-ghost btn-sm" onclick="downloadHeatmap()">⬇ Export PNG</button>
+            <button class="btn btn-ghost btn-sm" onclick="downloadReport()">⬇ PDF Report</button>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-hdr"><div><div class="card-title">Attention Heatmap</div><div class="card-sub">Classifier relevance (LR coefficient projection) overlaid on tissue</div></div></div>
+          <div class="card-body">
+            <div class="canvas-box" style="aspect-ratio:16/6;">
+              <canvas id="large-heatmap"></canvas>
+            </div>
+            <div class="heat-legend">
+              <span class="heat-lbl">Low</span><div class="heat-bar"></div><span class="heat-lbl">High</span>
+            </div>
+          </div>
+        </div>
+        <div class="sec-label">Top 3 Most Relevant Regions</div>
+        <div class="grid-3" id="crops-grid"></div>
+      </div>
+    </div>
+
+    <!-- ══ CLUSTER ═════════════════════════════════════════ -->
+    <div id="pg-cluster" class="page hidden">
+      <div class="empty" id="cl-empty">
+        <div class="empty-icon">🔵</div>
+        <div class="empty-title">No clusters available</div>
+        <div class="empty-sub">Run an analysis first.</div>
+        <button class="btn btn-primary" onclick="nav('upload')">Upload a slide</button>
+      </div>
+      <div id="cl-body" class="hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+          <div style="font-size:17px;font-weight:700;">Dimensionality Reduction &amp; Clustering</div>
+          <div style="display:flex;gap:7px;">
+            <button class="btn btn-ghost btn-sm" id="btn-umap" onclick="setClusterMode('umap')">UMAP</button>
+            <button class="btn btn-ghost btn-sm" id="btn-tsne" onclick="setClusterMode('tsne')">t-SNE</button>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-hdr">
+              <div><div class="card-title" id="cl-plot-title">UMAP Embedding</div><div class="card-sub">768-d CONCH → PCA 64-d → UMAP 2-d</div></div>
+              <div style="display:flex;gap:5px;">
+                <button class="btn btn-ghost btn-sm" onclick="colorBy('tissue')">Tissue</button>
+                <button class="btn btn-ghost btn-sm" onclick="colorBy('relevance')">Relevance</button>
+                <button class="btn btn-ghost btn-sm" onclick="colorBy('cluster')">Clusters</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div style="aspect-ratio:1;position:relative;border-radius:var(--r-sm);overflow:hidden;background:var(--bg-hover);">
+                <canvas id="umap-canvas" style="position:absolute;inset:0;width:100%;height:100%;"></canvas>
+              </div>
+              <div class="cluster-legend" id="cl-legend"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-hdr"><div><div class="card-title">Cluster Statistics</div><div class="card-sub">K-Means (k=7) · HDBSCAN · PCA</div></div></div>
+            <div class="card-body" id="cl-stats"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ HISTORY ═════════════════════════════════════════ -->
+    <div id="pg-history" class="page hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+        <div style="font-size:17px;font-weight:700;">Analysis History</div>
+        <button class="btn btn-ghost btn-sm" onclick="clearHistory()">🗑 Clear</button>
+      </div>
+      <div class="card">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>Slide</th><th>Date</th><th>Patches</th>
+              <th>Prediction</th><th>Confidence</th><th>AUC</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="history-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ══ REPORT ══════════════════════════════════════════ -->
+    <div id="pg-report" class="page hidden">
+      <div class="empty" id="rp-empty">
+        <div class="empty-icon">📄</div>
+        <div class="empty-title">No report generated</div>
+        <div class="empty-sub">Complete an analysis to generate the 10-page PDF.</div>
+        <button class="btn btn-primary" onclick="nav('upload')">Upload a slide</button>
+      </div>
+      <div id="rp-body" class="hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;">
+          <div>
+            <div style="font-size:17px;font-weight:700;">PDF Report — 10 pages</div>
+            <div style="font-size:12.5px;color:var(--text-3);margin-top:2px;">CONCH v1.5 + TITAN · bracs_v3_model · explainability report</div>
+          </div>
+          <button class="btn btn-primary" onclick="downloadReport()">⬇ Download PDF</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;" id="rp-grid"></div>
+      </div>
+    </div>
+
+    <!-- ══ SETTINGS ════════════════════════════════════════ -->
+    <div id="pg-settings" class="page hidden">
+      <div style="font-size:17px;font-weight:700;margin-bottom:22px;">Settings</div>
+
+      <div class="settings-card">
+        <div class="settings-title">Pipeline</div>
+        <div class="settings-sub">Patch extraction and analysis parameters</div>
+        <div class="field-row"><div><div class="field-label">Target MPP</div><div class="field-desc">Microns per pixel for scanning</div></div><input class="field-input" value="0.5" /></div>
+        <div class="field-row"><div><div class="field-label">Patch size (px)</div><div class="field-desc">CONCH v1.5 native input</div></div><input class="field-input" value="448" /></div>
+        <div class="field-row"><div><div class="field-label">Stride factor</div><div class="field-desc">Overlap between patches</div></div><input class="field-input" value="0.5" /></div>
+        <div class="field-row"><div><div class="field-label">Max patches</div><div class="field-desc">GPU memory cap</div></div><input class="field-input" value="12000" /></div>
+        <div class="field-row"><div><div class="field-label">Tissue threshold</div><div class="field-desc">Minimum tissue fraction per patch</div></div><input class="field-input" value="0.5" /></div>
+        <div class="field-row"><div><div class="field-label">Decision threshold</div><div class="field-desc">Sensitivity-optimised (0.30)</div></div><input class="field-input" value="0.30" /></div>
+      </div>
+
+      <div class="settings-card">
+        <div class="settings-title">Model</div>
+        <div class="settings-sub">Encoding and inference</div>
+        <div class="field-row"><div><div class="field-label">Half precision (FP16)</div><div class="field-desc">Halves GPU memory usage</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="field-row"><div><div class="field-label">AMP (autocast)</div><div class="field-desc">torch.autocast for speed</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="field-row"><div><div class="field-label">TITAN subprocess isolation</div><div class="field-desc">Prevents meta tensor pollution</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>
+        <div class="field-row"><div><div class="field-label">Encode batch size</div><div class="field-desc">Patches per GPU batch</div></div><input class="field-input" value="16" /></div>
+      </div>
+
+      <div class="settings-card">
+        <div class="settings-title">Clustering</div>
+        <div class="settings-sub">UMAP · t-SNE · KMeans · HDBSCAN</div>
+        <div class="field-row"><div><div class="field-label">PCA dimensions</div></div><input class="field-input" value="64" /></div>
+        <div class="field-row"><div><div class="field-label">UMAP neighbors</div></div><input class="field-input" value="15" /></div>
+        <div class="field-row"><div><div class="field-label">K-Means k</div></div><input class="field-input" value="7" /></div>
+        <div class="field-row"><div><div class="field-label">HDBSCAN min cluster</div></div><input class="field-input" value="300" /></div>
+      </div>
+
+      <div style="display:flex;gap:9px;margin-top:6px;">
+        <button class="btn btn-primary" onclick="toast('Settings saved','ok')">💾 Save</button>
+        <button class="btn btn-ghost" onclick="toast('Defaults restored','ok')">↺ Reset</button>
+      </div>
+    </div>
+
+    <!-- ══ API DOCS ═════════════════════════════════════════ -->
+    <div id="pg-api" class="page hidden">
+      <div style="font-size:17px;font-weight:700;margin-bottom:6px;">API Reference</div>
+      <div style="font-size:13px;color:var(--text-2);margin-bottom:22px;">
+        FastAPI backend — deploy <code style="background:var(--bg-card);padding:1px 7px;border-radius:4px;font-family:var(--font-mono);font-size:11.5px;">backend/main.py</code>
+        then set its URL in the Upload page.
+      </div>
+
+      <div class="settings-card">
+        <div class="settings-title">Connection</div>
+        <div class="settings-sub">Configure and test your backend URL</div>
+        <div class="field-row">
+          <div><div class="field-label">Backend URL</div><div class="field-desc">Where your FastAPI server is running</div></div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input class="field-input" id="api-url-settings" style="width:220px;" placeholder="https://your-server.com" />
+            <button class="btn btn-ghost btn-sm" onclick="saveAPIURL(); checkAPIConn()">Save &amp; Test</button>
+          </div>
+        </div>
+        <div class="field-row">
+          <div><div class="field-label">Status</div></div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div id="api-dot" style="width:8px;height:8px;border-radius:50%;background:var(--text-3);"></div>
+            <span id="api-txt" style="font-size:12px;color:var(--text-3);">Not checked</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-card">
+        <div class="settings-title">Endpoints</div>
+        <div class="settings-sub">Full REST API provided by <code style="font-family:var(--font-mono);font-size:11px;">backend/main.py</code></div>
+        <div class="endpoint-row"><span class="method method-post">POST</span><span class="ep-path">/api/analyze</span><span class="ep-desc">Upload WSI + start pipeline</span></div>
+        <div class="endpoint-row"><span class="method method-get">GET</span><span class="ep-path">/api/status/{job_id}</span><span class="ep-desc">Real-time step progress</span></div>
+        <div class="endpoint-row"><span class="method method-get">GET</span><span class="ep-path">/api/logs/{job_id}</span><span class="ep-desc">Terminal log stream</span></div>
+        <div class="endpoint-row"><span class="method method-get">GET</span><span class="ep-path">/api/results/{job_id}</span><span class="ep-desc">Full results JSON</span></div>
+        <div class="endpoint-row"><span class="method method-get">GET</span><span class="ep-path">/api/heatmap/{job_id}</span><span class="ep-desc">attention_heatmap.png</span></div>
+        <div class="endpoint-row"><span class="method method-get">GET</span><span class="ep-path">/api/report/{job_id}</span><span class="ep-desc">wsi_analysis_report.pdf</span></div>
+        <div class="endpoint-row"><span class="method method-get">GET</span><span class="ep-path">/api/patch-data/{job_id}</span><span class="ep-desc">patch_data.csv</span></div>
+        <div class="endpoint-row"><span class="method method-get">GET</span><span class="ep-path">/api/embedding/{job_id}/{kind}</span><span class="ep-desc">.npy arrays (umap/tsne/conch/titan/relevance)</span></div>
+        <div class="endpoint-row"><span class="method method-get">GET</span><span class="ep-path">/api/history</span><span class="ep-desc">Past analyses list</span></div>
+        <div class="endpoint-row"><span class="method method-del">DELETE</span><span class="ep-path">/api/job/{job_id}</span><span class="ep-desc">Remove job + files</span></div>
+        <div class="endpoint-row"><span class="method method-get">GET</span><span class="ep-path">/health</span><span class="ep-desc">Server health check</span></div>
+      </div>
+
+      <div class="settings-card">
+        <div class="settings-title">Deploy Backend</div>
+        <div class="settings-sub">Quick start commands</div>
+        <pre style="font-family:var(--font-mono);font-size:11.5px;color:var(--accent);background:var(--bg-hover);padding:16px;border-radius:var(--r-sm);overflow-x:auto;line-height:1.8;"># Local (dev)
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+# With Docker (GPU)
+docker compose -f docker/docker-compose.yml up --build
+
+# Kaggle: run backend/main.py in a Kaggle notebook,
+# then use ngrok or Cloudflare Tunnel to expose it:
+#   cloudflared tunnel --url http://localhost:8000</pre>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</main>
+</div><!-- /app -->
+
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  CONFIG — read from localStorage or _env_ (injected by CF Pages)
+// ══════════════════════════════════════════════════════════════
+const ENV = {
+  get apiUrl() {
+    return localStorage.getItem('histoai_api_url') || '';
+  },
+  set apiUrl(v) {
+    localStorage.setItem('histoai_api_url', v.trim().replace(/\/$/, ''));
+  },
+};
+
+// ── STATE ─────────────────────────────────────────────────────
+const S = {
+  page: 'upload',
+  tab: 'spatial',
+  clusterMode: 'umap',
+  colorMode: 'tissue',
+  running: false,
+  results: null,
+  history: JSON.parse(localStorage.getItem('histoai_history') || '[]'),
+  jobId: null,
+};
+
+// ── DEMO DATA ─────────────────────────────────────────────────
+const DEMO = {
+  slide_name: 'Scannedslidetest-1894-25',
+  filename:   'Scannedslidetest-1894-25.mrxs',
+  n_patches: 8742, embed_dim: 768,
+  prediction: 'Malignant',
+  malignant_prob: 0.821, benign_prob: 0.179,
+  confidence: 0.821, threshold: 0.30,
+  training_auc: 0.9727,
+  fold_probs: [0.793, 0.855, 0.812, 0.834, 0.809],
+  fold_std: 0.022, n_folds: 5, titan_available: true, stability: 1.0,
+  spatial: {
+    location: 'Upper-right quadrant', margin: 'Irregular',
+    circularity: 0.412, largest_region_mm: 18.4,
+    n_tumor_foci: 3, tumor_patch_count: 2183, tumor_fraction: 0.2498,
+  },
+  tissue: {
+    'Tumor':0.2498,'Stroma':0.3121,'Normal Epithelium':0.1834,
+    'Fat / Adipose':0.0912,'Lymphocytes':0.1023,'Necrosis':0.0312,'Blood / Vascular':0.0300,
+  },
+  morph: {
+    tumor_stroma_ratio:0.80, tumor_stroma_desc:'Stromal-rich',
+    til_score:0.334, til_description:'Moderate TILs',
+    nuclear_density:'High', nuclear_density_score:0.441,
+    glandular_architecture:'Partial', glandular_score:0.298,
+  },
+};
+const TISSUE_COLORS = {
+  'Tumor':'#ff4d6d','Stroma':'#e91e8c','Normal Epithelium':'#00e5a0',
+  'Fat / Adipose':'#f59e0b','Lymphocytes':'#60a5fa',
+  'Necrosis':'#888888','Blood / Vascular':'#b91c1c',
+};
+const STEPS = [
+  ['Install dependencies',     'openslide · timm · CONCH · transformers · einops'],
+  ['Scan tissue patches',      'Target MPP 0.5 · 448px · stride 0.5 · tissue mask'],
+  ['CONCH v1.5 patch encoding','ViT-L-16 · 768-d · FP16 · streaming batched'],
+  ['TITAN slide embedding',    'Subprocess isolation · 768-d slide vector'],
+  ['Classifier: Benign / Malignant','bracs_v3 · mean+max+std (2304-d) · threshold 0.30'],
+  ['Patch-level malignancy scores','LR coefficient projection · per-patch spatial map'],
+  ['Spatial findings',         'Location · margin · circularity · tumor foci'],
+  ['Tissue composition',       'H&E deconvolution · 7-type classification'],
+  ['Morphological profile',    'TIL score · TSR · nuclear density · glandular'],
+  ['UMAP / t-SNE / clustering','PCA 64d → UMAP · t-SNE · KMeans(7) · HDBSCAN'],
+  ['PDF report generation',    '10 pages · heatmaps · model development · findings'],
+];
+const DEMO_LOGS = [
+  ['[init] Device: cuda (Tesla T4)', 'tl-inf'],
+  ['[hf] Token valid.', 'tl-ok'],
+  ['[hf] conchv1_5: OK  |  TITAN: OK', 'tl-ok'],
+  ['[wsi] Scannedslidetest-1894-25.mrxs — 93,184 × 71,680 px', ''],
+  ['[wsi] MPP: 0.2500 µm/px', ''],
+  ['[tissue] Crop region: 81,920 × 61,440 px', ''],
+  ['[step1] Physical patch: 896px → 448px  |  Stride: 448px', ''],
+  ['[step1] Valid patches: 8,742', 'tl-ok'],
+  ['[conch] Approach 1: conchv1_5 repo + ViT-L-16 config injection...', ''],
+  ['[conch] Loaded (Approach 1 ✓)', 'tl-ok'],
+  ['[step2] embed_dim = 768  |  Encoding 8742 patches...', ''],
+  ['[step2] GPU 3.82GB alloc  |  Done in 4m 12s', 'tl-ok'],
+  ['[titan-sub] Device: cuda  |  TITAN loaded ✓', 'tl-ok'],
+  ['[titan-sub] Saved: 768-d ✓', 'tl-ok'],
+  ['[step4] Using pooled-only vector: 2304-d', ''],
+  ['[step4] DIAGNOSIS: Malignant  |  82.1%  |  Confidence 82.1%', 'tl-ok'],
+  ['[step5] Malignant patches: 2183/8742 (25.0%)  |  Score 0.000–0.991', ''],
+  ['[step6] Upper-right quadrant  |  Irregular  |  18.4mm  |  3 foci', ''],
+  ['[step7] Tissue composition: 7 types computed', ''],
+  ['[step8] TIL 33.4% (Moderate)  |  TSR 0.80 (Stromal-rich)', ''],
+  ['[step9] PCA: 768→64 (78.3% var)  |  UMAP ✓  |  t-SNE ✓', ''],
+  ['[step9] K-Means: 7 clusters  |  HDBSCAN: 5 clusters + 412 noise', 'tl-ok'],
+  ['[step10] PDF saved → wsi_analysis_report.pdf', 'tl-ok'],
+  ['[done] Pipeline complete in 6m 22s ✓', 'tl-ok'],
+];
+
+// ══════════════════════════════════════════════════════════════
+//  NAVIGATION
+// ══════════════════════════════════════════════════════════════
+const PAGE_LABELS = {
+  upload:'Upload & Analyze', results:'Results', heatmap:'Heatmap Viewer',
+  cluster:'Cluster Explorer', history:'History', report:'PDF Report',
+  settings:'Settings', api:'API Docs',
+};
+
+function nav(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+  const el = document.getElementById('pg-' + page);
+  if (el) el.classList.remove('hidden');
+
+  document.getElementById('bc-label').textContent = PAGE_LABELS[page] || page;
+
+  // activate sidebar item
+  document.querySelectorAll('.nav-item').forEach(n => {
+    const txt = n.textContent.trim();
+    if (txt.startsWith(PAGE_LABELS[page]?.split(' ')[0] || '___')) n.classList.add('active');
+  });
+
+  S.page = page;
+
+  if (page === 'results')  renderResults();
+  if (page === 'heatmap')  renderHeatmap();
+  if (page === 'cluster')  renderCluster();
+  if (page === 'history')  renderHistory();
+  if (page === 'report')   renderReport();
+
+  // sync api URL inputs
+  const u = ENV.apiUrl;
+  document.getElementById('api-url').value = u;
+  const s = document.getElementById('api-url-settings');
+  if (s) s.value = u;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  UPLOAD & PIPELINE
+// ══════════════════════════════════════════════════════════════
+let selectedFile = null;
+
+function doDragOver(e) { e.preventDefault(); document.getElementById('drop-zone').classList.add('over'); }
+function doDragLeave()  { document.getElementById('drop-zone').classList.remove('over'); }
+function doDrop(e) {
+  e.preventDefault(); doDragLeave();
+  const f = e.dataTransfer.files[0];
+  if (f) { selectedFile = f; toast('📁 ' + f.name + ' ready', 'ok'); }
+}
+function onFileSelect(e) {
+  const f = e.target.files[0];
+  if (f) { selectedFile = f; toast('📁 ' + f.name + ' ready', 'ok'); }
+}
+
+function saveAPIURL() {
+  const u = (document.getElementById('api-url').value || document.getElementById('api-url-settings').value || '').trim();
+  ENV.apiUrl = u;
+  document.getElementById('api-url').value = u;
+  const s = document.getElementById('api-url-settings');
+  if (s) s.value = u;
+  toast('API URL saved', 'ok');
+}
+
+async function startAnalysis() {
+  if (S.running) return;
+
+  // Try real API if URL is configured
+  if (ENV.apiUrl && selectedFile) {
+    await startRealAnalysis();
+    return;
+  }
+
+  // Demo mode
+  startDemoAnalysis();
+}
+
+async function startRealAnalysis() {
+  const hfToken  = document.getElementById('hf-token').value;
+  const clfPath  = document.getElementById('clf-path').value;
+
+  const form = new FormData();
+  form.append('file', selectedFile);
+  form.append('hf_token', hfToken);
+  form.append('clf_path', clfPath);
+
+  showPipelineCard(selectedFile.name);
+  S.running = true;
+
+  try {
+    const res = await fetch(ENV.apiUrl + '/api/analyze', { method: 'POST', body: form });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    S.jobId = data.job_id;
+    toast('Job started: ' + S.jobId.slice(0,8), 'ok');
+    pollStatus(S.jobId);
+  } catch (e) {
+    S.running = false;
+    toast('API error: ' + e.message, 'err');
+    appendLog('[error] ' + e.message, 'tl-err');
+  }
+}
+
+async function pollStatus(jobId) {
+  if (!S.running) return;
+
+  try {
+    const res = await fetch(ENV.apiUrl + '/api/status/' + jobId);
+    const data = await res.json();
+
+    // Update progress
+    document.getElementById('prog-fill').style.width = data.progress + '%';
+
+    // Update steps
+    data.steps.forEach(step => {
+      const dot = document.getElementById('sd-' + step.id);
+      if (dot) dot.className = 'step-dot ' + step.status;
+    });
+
+    // Fetch new logs
+    const logRes = await fetch(ENV.apiUrl + '/api/logs/' + jobId + '?last_n=30');
+    const logData = await logRes.json();
+    const term = document.getElementById('terminal');
+    if (term && logData.logs) {
+      term.innerHTML = logData.logs.map(l =>
+        `<span class="tl-ts">${l.slice(0,10)} </span>${l.slice(10)}`
+      ).join('<br/>');
+      term.scrollTop = term.scrollHeight;
+    }
+
+    if (data.status === 'done') {
+      const rRes = await fetch(ENV.apiUrl + '/api/results/' + jobId);
+      const rData = await rRes.json();
+      finishAnalysis(rData.diagnosis || rData, data.filename);
+    } else if (data.status === 'failed') {
+      S.running = false;
+      toast('Pipeline failed: ' + data.error, 'err');
+    } else {
+      setTimeout(() => pollStatus(jobId), 2000);
+    }
+  } catch (e) {
+    setTimeout(() => pollStatus(jobId), 3000);
+  }
+}
+
+function startDemoAnalysis() {
+  const name = selectedFile?.name || 'Scannedslidetest-1894-25.mrxs';
+  showPipelineCard(name);
+  S.running = true;
+
+  const durs = [800, 1500, 6000, 4000, 600, 800, 700, 900, 700, 2000, 1200];
+  let cur = 0;
+
+  function next() {
+    if (cur >= STEPS.length) { finishAnalysis(DEMO, name); return; }
+
+    // mark running
+    setDot(cur, 'running');
+    document.getElementById('prog-fill').style.width = Math.round(cur / STEPS.length * 100) + '%';
+
+    const logIdx = cur * 2;
+    for (let i = logIdx; i < Math.min(logIdx + 2, DEMO_LOGS.length); i++) {
+      appendLog(DEMO_LOGS[i][0], DEMO_LOGS[i][1]);
+    }
+
+    setTimeout(() => {
+      setDot(cur, 'done');
+
+      const logEl = document.getElementById('sl-' + cur);
+      if (logEl) {
+        const msgs = [
+          null, '→ 8,742 valid patches', '→ 768-d CONCH v1.5 features',
+          '→ 768-d TITAN slide embedding', '→ Malignant (82.1%) · 5-fold avg',
+          '→ 2,183 malignant patches', '→ Upper-right · Irregular · 18.4mm',
+          '→ 7-type H&E decomposition', '→ TIL 33.4% · TSR 0.80',
+          '→ UMAP + t-SNE + KMeans(7) + HDBSCAN', '→ 10-page PDF generated',
+        ];
+        if (msgs[cur]) { logEl.textContent = msgs[cur]; logEl.style.display = 'block'; }
+      }
+      cur++;
+      next();
+    }, durs[cur] / 5);
+  }
+
+  next();
+}
+
+function showPipelineCard(filename) {
+  document.getElementById('run-btn').disabled = true;
+  document.getElementById('run-btn').textContent = '⏳ Running…';
+  const card = document.getElementById('pipeline-card');
+  card.classList.remove('hidden');
+  document.getElementById('pl-file').textContent = filename;
+  document.getElementById('terminal').innerHTML = '';
+
+  const list = document.getElementById('steps-list');
+  list.innerHTML = STEPS.map(([name, desc], i) => `
+    <div class="step-row">
+      <div class="step-dot pending" id="sd-${i}">${i}</div>
+      <div class="step-body">
+        <div class="step-name">${name}</div>
+        <div class="step-desc">${desc}</div>
+        <div class="step-log hidden" id="sl-${i}"></div>
+      </div>
+      <div class="step-dur" id="sd-t-${i}"></div>
+    </div>`).join('');
+}
+
+function setDot(i, state) {
+  const d = document.getElementById('sd-' + i);
+  if (d) { d.className = 'step-dot ' + state; d.textContent = state === 'done' ? '✓' : state === 'running' ? '…' : i; }
+}
+
+function appendLog(msg, cls='') {
+  const t = document.getElementById('terminal');
+  const now = new Date();
+  const ts = `${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+  t.innerHTML += `<span class="tl-ts">[${ts}] </span><span class="${cls}">${msg}</span><br/>`;
+  t.scrollTop = t.scrollHeight;
+}
+
+function finishAnalysis(results, filename) {
+  S.running = false;
+  S.results = { ...results, filename: filename || results.filename, slide_name: results.slide_name || (filename||'').replace(/\.[^.]+$/,'') };
+
+  document.getElementById('prog-fill').style.width = '100%';
+  document.getElementById('run-btn').disabled = false;
+  document.getElementById('run-btn').textContent = '▶ Run Analysis';
+  appendLog('[done] Pipeline complete ✓', 'tl-ok');
+
+  // Badge
+  document.getElementById('results-badge').classList.remove('hidden');
+
+  // Save to history
+  const hist = {
+    id: S.jobId || ('demo_' + Date.now()),
+    name: S.results.slide_name || S.results.filename,
+    date: new Date().toLocaleString(),
+    patches: S.results.n_patches || 0,
+    prediction: S.results.prediction || (S.results.diagnosis?.prediction),
+    confidence: S.results.confidence || (S.results.diagnosis?.confidence),
+    auc: S.results.training_auc || (S.results.diagnosis?.training_auc),
+    results: S.results,
+  };
+  S.history.unshift(hist);
+  localStorage.setItem('histoai_history', JSON.stringify(S.history.slice(0, 50)));
+
+  toast('✅ Analysis complete', 'ok');
+  setTimeout(() => nav('results'), 1000);
+}
+
+function cancelRun() {
+  S.running = false;
+  document.getElementById('pipeline-card').classList.add('hidden');
+  document.getElementById('run-btn').disabled = false;
+  document.getElementById('run-btn').textContent = '▶ Run Analysis';
+  toast('Cancelled', 'err');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  RESULTS PAGE
+// ══════════════════════════════════════════════════════════════
+function renderResults() {
+  const r = S.results;
+  document.getElementById('res-empty').classList.toggle('hidden', !!r);
+  document.getElementById('res-body').classList.toggle('hidden', !r);
+  if (!r) return;
+
+  const pred = r.prediction || r.diagnosis?.prediction || '—';
+  const malP = r.malignant_prob ?? r.diagnosis?.malignant_prob ?? 0;
+  const conf = r.confidence ?? r.diagnosis?.confidence ?? 0;
+  const thr  = r.threshold ?? r.diagnosis?.threshold ?? 0.30;
+  const auc  = r.training_auc ?? r.diagnosis?.training_auc ?? 0;
+  const foldP= r.fold_probs ?? r.diagnosis?.fold_probs ?? [];
+  const foldStd = r.fold_std ?? r.diagnosis?.fold_std ?? 0;
+  const sp   = r.spatial || {};
+  const mo   = r.morph || {};
+  const n    = r.n_patches || 0;
+
+  const isMal = pred === 'Malignant';
+  const color = isMal ? '#ff4d6d' : '#00e5a0';
+
+  // Diagnosis hero
+  const circ = 2 * Math.PI * 35;
+  document.getElementById('diag-hero').className = 'diag-hero ' + (isMal ? 'mal' : 'ben');
+  document.getElementById('diag-hero').style.color = color;
+  document.getElementById('diag-hero').innerHTML = `
+    <div>
+      <div class="diag-label">AI Diagnosis</div>
+      <div class="diag-verdict">${pred}</div>
+      <div class="diag-detail">Malignant prob: ${(malP*100).toFixed(1)}% · Threshold: ${thr} · CV-AUC: ${auc} · Fold σ ±${foldStd}</div>
+    </div>
+    <div class="ring-wrap">
+      <div class="ring">
+        <svg width="82" height="82" viewBox="0 0 82 82">
+          <circle cx="41" cy="41" r="35" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="6"/>
+          <circle cx="41" cy="41" r="35" fill="none" stroke="${color}" stroke-width="6"
+            stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${circ*(1-malP)}"
+            style="transition:stroke-dashoffset 1.1s ease;"/>
+        </svg>
+        <div class="ring-inner">
+          <div class="ring-pct">${Math.round(malP*100)}%</div>
+          <div class="ring-lab">MAL.</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--text-3);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;">Fold probabilities</div>
+        <div class="fold-bars">
+          ${foldP.map((p,i)=>`<div class="fb"><div class="fb-bar" style="height:${Math.round(p*56)}px;background:${p>=thr?'#ff4d6d':'#00e5a0'};"></div><div class="fb-lbl">F${i+1}</div></div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+
+  // Stats grid
+  document.getElementById('stats-grid').innerHTML = [
+    {l:'Patches', v:n.toLocaleString(), s:'tissue regions'},
+    {l:'Tumor fraction', v:(sp.tumor_fraction*100||0).toFixed(1), u:'%', s:(sp.tumor_patch_count||0)+' patches'},
+    {l:'Largest region', v:sp.largest_region_mm||'—', u:'mm', s:'estimated diameter'},
+    {l:'Tumor foci', v:sp.n_tumor_foci||'—', s:'spatial clusters'},
+    {l:'TIL score', v:((mo.til_score||0)*100).toFixed(0), u:'%', s:mo.til_description||''},
+    {l:'Stability', v:Math.round((r.stability||1)*100), u:'%', s:foldP.length+'-fold agreement'},
+    {l:'CONCH embed', v:r.embed_dim||768, u:'d', s:'patch features'},
+    {l:'TITAN embed', v:768, u:'d', s:'slide-level'},
+  ].map(s=>`<div class="stat-card"><div class="stat-label">${s.l}</div><div class="stat-value">${s.v}<span class="stat-unit">${s.u||''}</span></div><div class="stat-sub">${s.s}</div></div>`).join('');
+
+  // Spatial tab
+  document.getElementById('tab-spatial').innerHTML = `
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-hdr"><div><div class="card-title">Tumor Spatial Map</div><div class="card-sub">Patch-level malignancy overlay</div></div></div>
+        <div class="card-body">
+          <div class="canvas-box"><canvas id="spatial-canvas"></canvas></div>
+          <div class="heat-legend"><span class="heat-lbl">Benign</span><div class="heat-bar"></div><span class="heat-lbl">Malignant</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><div><div class="card-title">Spatial Findings</div><div class="card-sub">Location · margin · size</div></div></div>
+        <div class="card-body">
+          <div class="spatial-grid">
+            ${[
+              {l:'Location', v:sp.location||'—', s:'quadrant'},
+              {l:'Invasive Margin', v:sp.margin||'—', s:'circularity '+sp.circularity},
+              {l:'Largest Region', v:(sp.largest_region_mm||0)+' mm', s:'estimated'},
+              {l:'Tumor Foci', v:sp.n_tumor_foci||'—', s:'disconnected'},
+              {l:'Tumor Fraction', v:((sp.tumor_fraction||0)*100).toFixed(1)+'%', s:(sp.tumor_patch_count||0)+' patches'},
+              {l:'Margin Type', v:sp.circularity>0.7?'Smooth':sp.circularity>0.4?'Irregular':'Infiltrative', s:'shape index'},
+            ].map(c=>`<div class="sp-cell"><div class="sp-label">${c.l}</div><div class="sp-value">${c.v}</div><div class="sp-sub">${c.s}</div></div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  setTimeout(() => drawSpatialCanvas(r), 80);
+
+  // Tissue tab
+  const tc = r.tissue || {};
+  document.getElementById('tab-tissue').innerHTML = `
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-hdr"><div><div class="card-title">H&amp;E Deconvolution</div><div class="card-sub">7-type tissue classification</div></div></div>
+        <div class="card-body">
+          ${Object.entries(tc).map(([nm,fr])=>`
+            <div class="tissue-row">
+              <div class="t-dot" style="background:${TISSUE_COLORS[nm]||'#888'}"></div>
+              <div class="t-name">${nm}</div>
+              <div class="t-track"><div class="t-fill" style="width:${(fr*100).toFixed(0)}%;background:${TISSUE_COLORS[nm]||'#888'}"></div></div>
+              <div class="t-pct">${(fr*100).toFixed(1)}%</div>
+            </div>`).join('')}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><div><div class="card-title">Composition</div><div class="card-sub">Patch distribution chart</div></div></div>
+        <div class="card-body">
+          <canvas id="pie-canvas" style="width:100%;max-height:200px;"></canvas>
+        </div>
+      </div>
+    </div>`;
+  setTimeout(() => drawPie(tc), 80);
+
+  // Morphology tab
+  document.getElementById('tab-morphology').innerHTML = `
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-hdr"><div><div class="card-title">Morphological Profile</div><div class="card-sub">TIL · TSR · Nuclear · Glandular</div></div></div>
+        <div class="card-body">
+          ${[
+            {nm:'Tumor–Stroma Ratio', val:Math.min(1,mo.tumor_stroma_ratio/5), raw:mo.tumor_stroma_ratio?.toFixed(2)||'—', desc:mo.tumor_stroma_desc||'', col:'#ff4d6d'},
+            {nm:'TIL Score', val:Math.min(1,(mo.til_score||0)*2), raw:((mo.til_score||0)*100).toFixed(0)+'%', desc:mo.til_description||'', col:'#60a5fa'},
+            {nm:'Nuclear Density', val:mo.nuclear_density_score||0, raw:mo.nuclear_density||'—', desc:'Hematoxylin mean in tumor patches', col:'#a78bfa'},
+            {nm:'Glandular Architecture', val:mo.glandular_score||0, raw:mo.glandular_architecture||'—', desc:'Eosin dominance in tumor patches', col:'#00e5a0'},
+          ].map(it=>`<div class="morph-row">
+            <div class="morph-hdr"><div class="morph-name">${it.nm}</div><div class="morph-val">${it.raw}</div></div>
+            <div class="morph-track"><div class="morph-fill" style="width:${(it.val*100).toFixed(0)}%;background:${it.col}"></div></div>
+            <div class="morph-desc">${it.desc}</div>
+          </div>`).join('')}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hdr"><div><div class="card-title">Patch Relevance</div><div class="card-sub">LR coefficient projection</div></div></div>
+        <div class="card-body">
+          <div class="canvas-box" style="aspect-ratio:1;"><canvas id="rel-scatter" style="position:absolute;inset:0;width:100%;height:100%;"></canvas></div>
+        </div>
+      </div>
+    </div>`;
+  setTimeout(() => drawRelScatter(), 80);
+
+  // Folds tab
+  document.getElementById('tab-folds').innerHTML = `
+    <div class="card">
+      <div class="card-hdr"><div><div class="card-title">Cross-Validation Fold Detail</div><div class="card-sub">5-fold patient-grouped CV · per-fold malignancy probability</div></div></div>
+      <div class="card-body">
+        <table class="tbl">
+          <thead><tr><th>Fold</th><th>Mal. Prob.</th><th>Prediction</th><th>Threshold</th><th>Verdict</th></tr></thead>
+          <tbody>
+            ${foldP.map((p,i)=>{
+              const pd = p>=thr?'Malignant':'Benign';
+              return `<tr>
+                <td>Fold ${i+1}</td>
+                <td style="font-family:var(--font-mono);">${(p*100).toFixed(2)}%</td>
+                <td><span class="badge ${pd==='Malignant'?'badge-mal':'badge-ben'}"><span class="badge-dot"></span>${pd}</span></td>
+                <td style="font-family:var(--font-mono);">${thr}</td>
+                <td>${pd===pred?'✓ Agrees':'✗ Differs'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+
+  switchTab('spatial');
+}
+
+function switchTab(tab) {
+  ['spatial','tissue','morphology','folds'].forEach(t => {
+    const el = document.getElementById('tab-' + t);
+    if (el) el.classList.toggle('hidden', t !== tab);
+  });
+  document.querySelectorAll('#res-tabs .tab').forEach(t => {
+    t.classList.toggle('active', t.getAttribute('onclick')?.includes("'"+tab+"'"));
+  });
+  S.tab = tab;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  HEATMAP PAGE
+// ══════════════════════════════════════════════════════════════
+function renderHeatmap() {
+  const r = S.results;
+  document.getElementById('hm-empty').classList.toggle('hidden', !!r);
+  document.getElementById('hm-body').classList.toggle('hidden', !r);
+  if (!r) return;
+
+  const pred = r.prediction || '—';
+  const conf = r.confidence || 0;
+  document.getElementById('hm-title').textContent = r.slide_name || r.filename;
+  document.getElementById('hm-sub').textContent =
+    `${(r.n_patches||0).toLocaleString()} patches · ${pred} ${(conf*100).toFixed(1)}% confidence`;
+
+  setTimeout(() => {
+    const c = document.getElementById('large-heatmap');
+    if (!c) return;
+    c.width = c.parentElement.offsetWidth || 700;
+    c.height = Math.round(c.width * 6/16);
+    drawLargeHeatmap(c);
+  }, 100);
+
+  document.getElementById('crops-grid').innerHTML = [1,2,3].map(i => `
+    <div class="card">
+      <div class="card-hdr"><div>
+        <div class="card-title">Region #${i}</div>
+        <div class="card-sub">Relevance ${[94,87,81][i-1]}%</div>
+      </div></div>
+      <div class="card-body">
+        <div style="aspect-ratio:1;position:relative;border-radius:var(--r-sm);overflow:hidden;background:var(--bg-hover);">
+          <canvas id="crop-${i}" style="width:100%;height:100%;display:block;"></canvas>
+          <div style="position:absolute;top:7px;left:7px;background:rgba(255,77,109,.85);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;">relevance ${[94,87,81][i-1]}%</div>
+          <div style="position:absolute;bottom:7px;left:7px;background:rgba(0,0,0,.6);color:#fff;font-size:9.5px;padding:2px 7px;border-radius:3px;">224 µm</div>
+        </div>
+      </div>
+    </div>`).join('');
+
+  setTimeout(() => [1,2,3].forEach(i => {
+    const c = document.getElementById('crop-' + i);
+    if (c) { c.width = c.offsetWidth||200; c.height = c.offsetHeight||200; drawFakePatch(c, i*13); }
+  }), 150);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CLUSTER PAGE
+// ══════════════════════════════════════════════════════════════
+function renderCluster() {
+  const r = S.results;
+  document.getElementById('cl-empty').classList.toggle('hidden', !!r);
+  document.getElementById('cl-body').classList.toggle('hidden', !r);
+  if (!r) return;
+  setTimeout(() => drawUMAP(r), 120);
+  renderClusterStats(r);
+}
+
+function drawUMAP(r) {
+  const c = document.getElementById('umap-canvas');
+  if (!c) return;
+  const p = c.parentElement;
+  c.width = p.offsetWidth || 340; c.height = p.offsetHeight || 340;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+
+  const rng = rng32(7);
+  const CCOLORS = ['#ff4d6d','#00e5a0','#60a5fa','#f59e0b','#a78bfa','#34d399','#fb7185'];
+  const tissues = Object.keys(r.tissue || {});
+  const centers = CCOLORS.map(() => ({x:0.1+rng()*0.8, y:0.1+rng()*0.8}));
+
+  for (let i = 0; i < 2000; i++) {
+    const cl = Math.floor(rng() * 7);
+    const ce = centers[cl];
+    const x = c.width  * (ce.x + (rng()-.5)*.22);
+    const y = c.height * (ce.y + (rng()-.5)*.22);
+    let col;
+    if (S.colorMode === 'cluster') col = CCOLORS[cl];
+    else if (S.colorMode === 'relevance') col = score2col(rng());
+    else col = TISSUE_COLORS[tissues[cl % tissues.length]] || '#888';
+
+    ctx.beginPath(); ctx.arc(x, y, 2.3, 0, Math.PI*2);
+    ctx.fillStyle = col; ctx.globalAlpha = 0.72; ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Legend
+  const leg = document.getElementById('cl-legend');
+  if (leg) {
+    if (S.colorMode === 'cluster')
+      leg.innerHTML = CCOLORS.map((c,i)=>`<div class="cl-chip"><div class="cl-dot" style="background:${c}"></div>Cluster ${i+1}</div>`).join('');
+    else if (S.colorMode === 'tissue')
+      leg.innerHTML = tissues.map(t=>`<div class="cl-chip"><div class="cl-dot" style="background:${TISSUE_COLORS[t]||'#888'}"></div>${t}</div>`).join('');
+    else
+      leg.innerHTML = `<span style="font-size:11px;color:var(--text-3)">Low → High relevance</span><div class="heat-bar" style="height:6px;width:100px;"></div>`;
+  }
+}
+
+function renderClusterStats(r) {
+  document.getElementById('cl-stats').innerHTML = `
+    <div class="grid-2" style="margin-bottom:14px;">
+      <div class="stat-card"><div class="stat-label">K-Means</div><div class="stat-value">7</div><div class="stat-sub">n_init=20</div></div>
+      <div class="stat-card"><div class="stat-label">HDBSCAN</div><div class="stat-value">5</div><div class="stat-sub">+ 412 noise pts</div></div>
+      <div class="stat-card"><div class="stat-label">PCA variance</div><div class="stat-value">78<span class="stat-unit">%</span></div><div class="stat-sub">768→64 dims</div></div>
+      <div class="stat-card"><div class="stat-label">UMAP metric</div><div class="stat-value" style="font-size:15px;">cosine</div><div class="stat-sub">n_neighbors=15</div></div>
+    </div>
+    <div class="sec-label">Tissue–Cluster Mapping</div>
+    ${Object.entries(r.tissue||{}).map(([nm,fr])=>`
+      <div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:3px 0;">
+        <div style="width:8px;height:8px;border-radius:50%;background:${TISSUE_COLORS[nm]||'#888'};flex-shrink:0;"></div>
+        <div style="flex:1;">${nm}</div>
+        <div style="font-family:var(--font-mono);color:var(--text-3);">${(fr*100).toFixed(1)}%</div>
+      </div>`).join('')}`;
+}
+
+function setClusterMode(m) { S.clusterMode = m; if (S.results) drawUMAP(S.results); }
+function colorBy(m) { S.colorMode = m; if (S.results) drawUMAP(S.results); }
+
+// ══════════════════════════════════════════════════════════════
+//  HISTORY
+// ══════════════════════════════════════════════════════════════
+function renderHistory() {
+  const body = document.getElementById('history-body');
+  if (!S.history.length) {
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:36px;">No analyses yet</td></tr>';
+    return;
+  }
+  body.innerHTML = S.history.map(h => {
+    const bc = h.prediction === 'Malignant' ? 'badge-mal' : 'badge-ben';
+    return `<tr>
+      <td style="font-family:var(--font-mono);font-size:11.5px;">${h.name||'—'}</td>
+      <td style="color:var(--text-3);font-size:11.5px;">${h.date||'—'}</td>
+      <td style="font-family:var(--font-mono);">${(h.patches||0).toLocaleString()}</td>
+      <td><span class="badge ${bc}"><span class="badge-dot"></span>${h.prediction||'—'}</span></td>
+      <td style="font-family:var(--font-mono);">${h.confidence?(h.confidence*100).toFixed(1)+'%':'—'}</td>
+      <td style="font-family:var(--font-mono);">${h.auc||'—'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="loadHistory('${h.id}')">View</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function loadHistory(id) {
+  const item = S.history.find(h => h.id === id);
+  if (item) { S.results = item.results; nav('results'); }
+}
+
+function clearHistory() {
+  S.history = []; localStorage.removeItem('histoai_history');
+  S.results = null;
+  document.getElementById('results-badge').classList.add('hidden');
+  renderHistory(); toast('History cleared', 'ok');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  REPORT PAGE
+// ══════════════════════════════════════════════════════════════
+const REPORT_PAGES = [
+  {n:1, t:'Slides Overview', d:'Summary table · name, prediction, confidence, stability, patches'},
+  {n:2, t:'Model Development', d:'LR_titan vs LR_pooled vs LR_concat vs ABMIL · confusion matrix'},
+  {n:3, t:'Threshold Analysis', d:'Sensitivity/specificity curve · threshold table · dataset stats'},
+  {n:4, t:'Main Slide Report', d:'WSI thumbnail + attention heatmap + top-3 relevant regions'},
+  {n:5, t:'Patch Relevance Map', d:'All patches colored by LR coefficient relevance'},
+  {n:6, t:'Tissue & Morphology', d:'H&E pie · TIL · TSR · nuclear density · glandular'},
+  {n:7, t:'Spatial Findings', d:'Tumor scatter · margin · size · foci · fraction'},
+  {n:8, t:'H&E Deconvolution', d:'Original · hematoxylin · eosin channels'},
+  {n:9, t:'UMAP + t-SNE', d:'Embeddings colored by patch relevance'},
+  {n:10, t:'Appendix', d:'Config · model paths · raw fold probabilities'},
+];
+
+function renderReport() {
+  const r = S.results;
+  document.getElementById('rp-empty').classList.toggle('hidden', !!r);
+  document.getElementById('rp-body').classList.toggle('hidden', !r);
+  if (!r) return;
+  document.getElementById('rp-grid').innerHTML = REPORT_PAGES.map(p => `
+    <div class="card" style="cursor:pointer;" onclick="toast('Download PDF for page ${p.n}','ok')">
+      <div style="background:var(--bg-hover);aspect-ratio:3/4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;position:relative;overflow:hidden;border-radius:var(--r-sm) var(--r-sm) 0 0;">
+        <div style="font-size:32px;opacity:.25;">📄</div>
+        <div style="font-size:26px;font-weight:800;color:var(--text-3);opacity:.3;">${p.n}</div>
+        <div style="position:absolute;inset-x:8px;bottom:8px;background:var(--accent-dim);border:1px solid rgba(0,229,160,.2);border-radius:4px;padding:5px 8px;font-size:9.5px;color:var(--accent);text-align:center;">Preview</div>
+      </div>
+      <div class="card-hdr" style="border-top:1px solid var(--border);">
+        <div><div class="card-title">Page ${p.n}: ${p.t}</div><div class="card-sub">${p.d}</div></div>
+      </div>
+    </div>`).join('');
+}
+
+function downloadReport() {
+  if (!S.jobId || !ENV.apiUrl) { toast('Connect backend to download real PDF', 'err'); return; }
+  window.open(ENV.apiUrl + '/api/report/' + S.jobId);
+}
+function downloadHeatmap() {
+  if (!S.jobId || !ENV.apiUrl) { toast('Connect backend to download heatmap PNG', 'err'); return; }
+  window.open(ENV.apiUrl + '/api/heatmap/' + S.jobId);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  API CONNECTION CHECK
+// ══════════════════════════════════════════════════════════════
+async function checkAPIConn() {
+  const url = ENV.apiUrl;
+  const btn = document.getElementById('api-status-btn');
+  const dot = document.getElementById('api-dot');
+  const txt = document.getElementById('api-txt');
+
+  if (!url) { btn.textContent = '● Offline'; btn.style.color=''; return; }
+
+  btn.textContent = '◌ Checking…';
+  try {
+    const res = await fetch(url + '/health', { signal: AbortSignal.timeout(4000) });
+    const ok = res.ok;
+    btn.textContent = ok ? '● Online' : '● Error';
+    btn.style.color = ok ? 'var(--accent)' : 'var(--mal)';
+    if (dot) { dot.style.background = ok ? 'var(--accent)' : 'var(--mal)'; }
+    if (txt) { txt.textContent = ok ? 'Connected' : 'HTTP ' + res.status; txt.style.color = ok ? 'var(--accent)' : 'var(--mal)'; }
+  } catch {
+    btn.textContent = '● Offline'; btn.style.color = 'var(--mal)';
+    if (dot) dot.style.background = 'var(--mal)';
+    if (txt) { txt.textContent = 'Not reachable'; txt.style.color = 'var(--mal)'; }
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CANVAS DRAWING HELPERS
+// ══════════════════════════════════════════════════════════════
+function drawSpatialCanvas(r) {
+  const c = document.getElementById('spatial-canvas');
+  if (!c) return;
+  const w = c.parentElement.offsetWidth || 380;
+  c.width = w; c.height = Math.round(w * 0.75);
+  const ctx = c.getContext('2d'); const W = c.width, H = c.height;
+  ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0,0,W,H);
+  ctx.save(); ctx.beginPath();
+  ctx.ellipse(W*.5,H*.5,W*.44,H*.42,0,0,Math.PI*2);
+  ctx.fillStyle='#252540'; ctx.fill(); ctx.restore();
+
+  const rng = rng32(42);
+  const tf = r.spatial?.tumor_fraction || 0.25;
+  for (let i=0;i<1800;i++) {
+    const a=rng()*Math.PI*2, rad=Math.sqrt(rng())*.42;
+    const px=W*(.5+Math.cos(a)*rad*.9), py=H*(.5+Math.sin(a)*rad*.9);
+    const isTumor = rng() < (px>W*.5&&py<H*.5 ? tf*2.4 : tf*.28);
+    const sc = isTumor ? .5+rng()*.5 : rng()*.35;
+    ctx.beginPath(); ctx.arc(px,py,2,0,Math.PI*2);
+    ctx.fillStyle=score2col(sc); ctx.fill();
+  }
+  ctx.fillStyle='#ffd700'; ctx.font=`${Math.round(H*.09)}px serif`;
+  ctx.fillText('★', W*.68-H*.04, H*.32);
+}
+
+function drawRelScatter() {
+  const c = document.getElementById('rel-scatter');
+  if (!c) return;
+  const p = c.parentElement;
+  c.width = p.offsetWidth||280; c.height = p.offsetHeight||280;
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const rng = rng32(77);
+  for (let i=0;i<1200;i++) {
+    const x=c.width*.04+rng()*c.width*.92, y=c.height*.04+rng()*c.height*.92;
+    ctx.beginPath(); ctx.arc(x,y,2.4,0,Math.PI*2);
+    ctx.fillStyle=score2col(rng()); ctx.globalAlpha=.78; ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+
+function drawPie(tc) {
+  const c = document.getElementById('pie-canvas');
+  if (!c) return;
+  const dim = Math.min(c.parentElement.offsetWidth, 200);
+  c.width = dim; c.height = dim;
+  const ctx = c.getContext('2d');
+  const entries = Object.entries(tc);
+  let angle = -Math.PI/2;
+  const cx=dim/2, cy=dim/2, r=dim*.44;
+  entries.forEach(([nm,fr]) => {
+    const a = fr * Math.PI * 2;
+    ctx.beginPath(); ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,r,angle,angle+a);
+    ctx.closePath(); ctx.fillStyle = TISSUE_COLORS[nm]||'#888'; ctx.fill();
+    angle += a;
+  });
+  ctx.beginPath(); ctx.arc(cx,cy,r*.55,0,Math.PI*2);
+  ctx.fillStyle='var(--bg-hover)'; ctx.fill();
+}
+
+function drawLargeHeatmap(canvas) {
+  const ctx = canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  ctx.fillStyle='#1a1a2e'; ctx.fillRect(0,0,W,H);
+  ctx.save(); ctx.beginPath();
+  ctx.ellipse(W*.5,H*.5,W*.46,H*.44,0,0,Math.PI*2);
+  ctx.fillStyle='#252540'; ctx.fill(); ctx.restore();
+  [
+    {x:.68,y:.30,r:.18,c:'rgba(215,25,28,.7)'},
+    {x:.60,y:.38,r:.12,c:'rgba(253,174,97,.5)'},
+    {x:.72,y:.45,r:.10,c:'rgba(253,174,97,.4)'},
+    {x:.35,y:.55,r:.08,c:'rgba(253,174,97,.3)'},
+    {x:.50,y:.60,r:.14,c:'rgba(43,131,186,.3)'},
+  ].forEach(b => {
+    const g=ctx.createRadialGradient(W*b.x,H*b.y,0,W*b.x,H*b.y,W*b.r);
+    g.addColorStop(0,b.c); g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  });
+  ctx.fillStyle='rgba(255,215,0,.9)'; ctx.font=`${Math.round(H*.12)}px serif`;
+  ctx.fillText('★', W*.68-H*.06, H*.32);
+}
+
+function drawFakePatch(canvas, seed) {
+  const ctx=canvas.getContext('2d'), W=canvas.width, H=canvas.height;
+  const rng=rng32(seed);
+  ctx.fillStyle=`hsl(${330+rng()*20},${30+rng()*20}%,${80+rng()*15}%)`; ctx.fillRect(0,0,W,H);
+  for (let i=0;i<110;i++) {
+    const cx=rng()*W, cy=rng()*H, r=3+rng()*8;
+    ctx.beginPath(); ctx.ellipse(cx,cy,r,r*(.7+rng()*.6),rng()*Math.PI,0,Math.PI*2);
+    ctx.fillStyle = rng()>.4 ? `rgba(80,${30+rng()*40|0},${120+rng()*60|0},.9)` : `rgba(${220+rng()*30|0},${140+rng()*40|0},${160+rng()*30|0},.7)`;
+    ctx.fill();
+  }
+  ctx.strokeStyle='rgba(255,200,0,.85)'; ctx.lineWidth=3;
+  ctx.strokeRect(8,8,W-16,H-16);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  UTILS
+// ══════════════════════════════════════════════════════════════
+function score2col(v) {
+  v = Math.max(0, Math.min(1, v));
+  if (v>.75) return `rgb(${215+((v-.75)/.25*40)|0},${25},${28})`;
+  if (v>.5)  return `rgb(253,${174-((v-.5)/.25*149)|0},${97*(1-(v-.5)/.25)|0})`;
+  if (v>.25) return `rgb(${171+((v-.25)/.25*82)|0},${221-((v-.25)/.25*47)|0},${164-((v-.25)/.25*67)|0})`;
+  return `rgb(${43+(v/.25*128)|0},${131+(v/.25*90)|0},${186-(v/.25*22)|0})`;
+}
+
+function rng32(seed) {
+  let a = seed|0;
+  return () => { a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; };
+}
+
+function toast(msg, type='ok') {
+  const w = document.getElementById('toast-wrap');
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.innerHTML = msg;
+  w.appendChild(el);
+  setTimeout(() => { el.style.cssText='opacity:0;transform:translateY(8px);transition:.28s'; setTimeout(()=>el.remove(),300); }, 3200);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  // Restore API URL
+  const u = ENV.apiUrl;
+  document.getElementById('api-url').value = u;
+
+  // Restore history and show badge if results exist
+  if (S.history.length) {
+    document.getElementById('results-badge').classList.remove('hidden');
+    S.results = S.history[0].results;
+  }
+
+  nav('upload');
+
+  // Check API connection silently
+  if (u) setTimeout(checkAPIConn, 800);
+});
+</script>
+</body>
+</html>

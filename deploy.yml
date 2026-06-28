@@ -1,0 +1,41 @@
+name: Deploy to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy Frontend
+
+    permissions:
+      contents: read
+      deployments: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Optional: inject API URL at build time ──────────────
+      # If you set HISTOAI_API_URL in GitHub Secrets, it gets
+      # baked into the HTML so the frontend knows where to call.
+      - name: Inject API URL (optional)
+        if: ${{ env.HISTOAI_API_URL != '' }}
+        env:
+          HISTOAI_API_URL: ${{ secrets.HISTOAI_API_URL }}
+        run: |
+          sed -i "s|localStorage.getItem('histoai_api_url') || ''|localStorage.getItem('histoai_api_url') || '${HISTOAI_API_URL}'|g" frontend/index.html
+
+      # ── Deploy to Cloudflare Pages ──────────────────────────
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: histoai           # must match your CF Pages project name
+          directory: frontend            # folder to publish
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.ref_name }}

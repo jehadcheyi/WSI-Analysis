@@ -1,0 +1,41 @@
+version: "3.9"
+
+# Backend-only compose.
+# Frontend is served by Cloudflare Pages (see .github/workflows/deploy.yml).
+#
+# Usage (GPU server / RunPod / Lambda Labs):
+#   cp .env.example .env          # fill in HF_TOKEN etc.
+#   docker compose up --build -d
+
+services:
+  api:
+    build: .
+    container_name: histoai-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+      - CLASSIFIER_PATH=/models/bracs_v3_model.pkl
+      - MAX_UPLOAD_MB=10000
+    volumes:
+      - ./uploads:/app/uploads
+      - ./results:/app/results
+      - ./models:/models:ro
+      - hf-cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    shm_size: "16g"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  hf-cache:
