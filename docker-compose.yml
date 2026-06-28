@@ -16,12 +16,12 @@ services:
       - "8000:8000"
     environment:
       - HF_TOKEN=${HF_TOKEN}
-      - CLASSIFIER_PATH=/models/bracs_v3_model.pkl
+      - CLASSIFIER_PATH=/model/bracs_v3_model.pkl
       - MAX_UPLOAD_MB=10000
     volumes:
       - ./uploads:/app/uploads
       - ./results:/app/results
-      - ./models:/models:ro
+      - ./model:/model:ro
       - hf-cache:/root/.cache/huggingface
     deploy:
       resources:

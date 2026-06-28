@@ -1,0 +1,20 @@
+# ──────────────────────────────────────────────────────────────
+#  Cloudflare Pages config — HistoAI frontend + /api proxy function
+# ──────────────────────────────────────────────────────────────
+name = "histoai"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "."
+
+# ── Plaintext VARIABLES (safe to commit) ──────────────────────
+# The backend base URL the Pages Function forwards to.
+# Override per-environment in the dashboard if you like.
+[vars]
+HISTOAI_API_URL = ""                      # e.g. https://histoai.your-server.com
+CLASSIFIER_PATH = "model/bracs_v3_model.pkl"
+
+# ── SECRETS (never commit) ────────────────────────────────────
+# HF_TOKEN is an encrypted secret — do NOT put it here.
+# Set it once with:
+#     wrangler pages secret put HF_TOKEN
+# or in the dashboard:  Pages → your project → Settings → Variables and Secrets
+#     → Add  →  type: Secret  →  name: HF_TOKEN  →  value: hf_xxx
