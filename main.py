@@ -27,7 +27,7 @@ import aiofiles
 # ─────────────────────────────────────────────────────────────
 UPLOAD_DIR      = Path("./uploads")
 RESULTS_DIR     = Path("./results")
-CLASSIFIER_PATH = os.getenv("CLASSIFIER_PATH", "./models/bracs_v3_model.pkl")
+CLASSIFIER_PATH = os.getenv("CLASSIFIER_PATH", "./model/bracs_v3_model.pkl")
 HF_TOKEN        = os.getenv("HF_TOKEN", "")
 MAX_UPLOAD_MB   = int(os.getenv("MAX_UPLOAD_MB", "10000"))   # 10 GB default
 

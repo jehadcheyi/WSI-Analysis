@@ -14,21 +14,23 @@ CV-AUC: 0.9727  ·  Threshold: 0.30  ·  Input: 2304-d (mean+max+std pooling)
 
 ```
 histoai/
-├── frontend/
-│   ├── index.html        ← single-page app (no build step needed)
-│   ├── _headers          ← Cloudflare Pages security headers
-│   └── _redirects        ← SPA routing (/* → /index.html 200)
+├── index.html            ← single-page app (no build step needed)
+├── _headers              ← Cloudflare Pages security headers
+├── _redirects            ← SPA routing (/* → /index.html 200)
+├── functions/
+│   └── api/
+│       └── [[path]].js   ← CF Pages Function: injects HF_TOKEN secret + proxies /api/*
+├── wrangler.toml         ← CF Pages config (vars + where to put the secret)
 │
-├── backend/
-│   ├── main.py           ← FastAPI server (11 REST endpoints)
-│   ├── requirements.txt
-│   ├── Dockerfile        ← CUDA 11.8 + openslide + all pipeline deps
-│   ├── docker-compose.yml
-│   └── .env.example
+├── main.py               ← FastAPI server (11 REST endpoints)
+├── requirements.txt
+├── Dockerfile            ← CUDA 11.8 + openslide + all pipeline deps
+├── docker-compose.yml
+├── .env.example
+├── model/
+│   └── bracs_v3_model.pkl  ← classifier (you add this)
 │
-└── .github/
-    └── workflows/
-        └── deploy.yml    ← GitHub Actions → Cloudflare Pages
+└── deploy.yml            ← GitHub Actions → Cloudflare Pages
 ```
 
 ---
@@ -69,12 +71,49 @@ Add these **GitHub Secrets** (Settings → Secrets → Actions):
 
 Every push to `main` auto-deploys via the GitHub Action **and** Cloudflare's own Git integration (use one or the other).
 
+> Build output directory is the repo root (`.`) — `index.html`, `_headers`,
+> `_redirects` and the `functions/` directory all live at the top level.
+
 **Option B — Manual deploy with Wrangler**
 
 ```bash
 npm install -g wrangler
-wrangler pages deploy frontend --project-name histoai
+wrangler pages deploy . --project-name histoai
 ```
+
+---
+
+## 2b — Cloudflare variables & secrets (HF token)
+
+The frontend is static, so the HuggingFace token is held by a small
+**Cloudflare Pages Function** (`functions/api/[[path]].js`). It reads the
+token from the Pages environment, injects it into `/api/analyze`, and
+forwards every `/api/*` call to your backend — so the token **never reaches
+the browser**.
+
+Set these in **Pages → your project → Settings → Variables and Secrets**
+(or via Wrangler):
+
+| Name | Type | Value |
+|------|------|-------|
+| `HISTOAI_API_URL` | **Variable** (plaintext) | Backend base URL, e.g. `https://histoai.your-server.com` |
+| `CLASSIFIER_PATH` | **Variable** (plaintext) | *(optional)* `model/bracs_v3_model.pkl` |
+| `HF_TOKEN` | **Secret** (encrypted) | Your HuggingFace token `hf_xxx` |
+
+```bash
+# Variable (plaintext) — also lives in wrangler.toml [vars]
+wrangler pages project ...    # or set HISTOAI_API_URL in the dashboard
+
+# Secret (encrypted) — NEVER commit this
+wrangler pages secret put HF_TOKEN
+```
+
+On the live site, just upload a slide and **Run Analysis** — no token entry
+needed. The HF-token field stays as an optional per-request override.
+
+> **Large slides:** the Pages Function buffers the upload, so multi-GB WSIs
+> can hit Cloudflare's request-size limit. For those, set the **API base URL**
+> field to your backend directly to bypass the CF proxy.
 
 ---
 
@@ -119,7 +158,7 @@ print("Backend URL:", tunnel.public_url)
 ```bash
 cd backend
 cp .env.example .env          # add your HF_TOKEN
-# Place bracs_v3_model.pkl in ./models/
+# Place bracs_v3_model.pkl in ./model/
 docker compose up --build -d
 
 # Point a domain / Cloudflare Proxy at port 8000
@@ -178,7 +217,7 @@ No framework, no build step, no npm — pure HTML/CSS/JS, deploys as-is to Cloud
 
 ## Notes
 
-- **No secrets in frontend** — HF_TOKEN and classifier path are sent to the backend API at analysis time, never stored in the static HTML.
+- **No secrets in frontend** — `HF_TOKEN` is stored as an encrypted Cloudflare **secret** and injected by the Pages Function (`functions/api/[[path]].js`) server-side. It is never stored in, or exposed to, the static HTML.
 - **CORS** — the backend allows all origins by default. Tighten to your CF Pages domain in production:
   ```python
   allow_origins=["https://histoai.pages.dev", "https://yourdomain.com"]

@@ -456,8 +456,8 @@
       </div>
 
       <div class="config-row">
-        <input class="field" type="password" id="hf-token" placeholder="🤗 HuggingFace token (MahmoodLab/conchv1_5 + TITAN)" />
-        <input class="field" type="text" id="clf-path" value="/models/bracs_v3_model.pkl" placeholder="Classifier .pkl path" style="flex:.8;" />
+        <input class="field" type="password" id="hf-token" placeholder="🤗 HuggingFace token — optional (injected from Cloudflare secret)" />
+        <input class="field" type="text" id="clf-path" value="model/bracs_v3_model.pkl" placeholder="Classifier .pkl path" style="flex:.8;" />
       </div>
       <div class="config-row" style="margin-top:8px;">
         <input class="field" id="api-url" value="" placeholder="API base URL — e.g. https://histoai.your-server.com" />
@@ -896,13 +896,18 @@ function saveAPIURL() {
 async function startAnalysis() {
   if (S.running) return;
 
-  // Try real API if URL is configured
-  if (ENV.apiUrl && selectedFile) {
+  // Real API when a file is selected and either:
+  //   • an explicit backend URL is set, or
+  //   • the page is served over http(s) — same-origin /api/* hits the
+  //     Cloudflare Pages Function, which injects the HF token (secret)
+  //     and forwards to the backend.
+  const sameOrigin = location.protocol.startsWith('http');
+  if (selectedFile && (ENV.apiUrl || sameOrigin)) {
     await startRealAnalysis();
     return;
   }
 
-  // Demo mode
+  // Demo mode (e.g. opened from file://)
   startDemoAnalysis();
 }
 

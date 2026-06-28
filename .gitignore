@@ -1,0 +1,23 @@
+# secrets / local env
+.env
+.env.local
+.dev.vars
+
+# runtime data
+uploads/
+results/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# node / wrangler
+node_modules/
+.wrangler/
+
+# os
+.DS_Store
+
+# NOTE: model/bracs_v3_model.pkl is intentionally committed.
