@@ -53,7 +53,6 @@ Add these **GitHub Secrets** (Settings → Secrets → Actions):
 |--------|-------|
 | `CLOUDFLARE_API_TOKEN` | CF API token with Pages:Edit permission |
 | `CLOUDFLARE_ACCOUNT_ID` | Your Cloudflare account ID |
-| `HISTOAI_API_URL` | *(optional)* Your backend URL, e.g. `https://api.histoai.com` — bakes it into the HTML |
 
 ---
 
@@ -85,11 +84,10 @@ wrangler pages deploy . --project-name histoai
 
 ## 2b — Cloudflare variables & secrets (HF token)
 
-The frontend is static, so the HuggingFace token is held by a small
-**Cloudflare Pages Function** (`functions/api/[[path]].js`). It reads the
-token from the Pages environment, injects it into `/api/analyze`, and
-forwards every `/api/*` call to your backend — so the token **never reaches
-the browser**.
+The frontend is static, so the HuggingFace token is kept in a
+**Cloudflare Pages secret** and injected server-side by the Pages Function.
+You do **not** need to paste the token into the browser field unless you want
+that one-request override.
 
 Set these in **Pages → your project → Settings → Variables and Secrets**
 (or via Wrangler):
@@ -108,12 +106,21 @@ wrangler pages project ...    # or set HISTOAI_API_URL in the dashboard
 wrangler pages secret put HF_TOKEN
 ```
 
-On the live site, just upload a slide and **Run Analysis** — no token entry
-needed. The HF-token field stays as an optional per-request override.
+The Cloudflare Function at `functions/api/[[path]].js` injects `HF_TOKEN`
+into `/api/analyze` and forwards every `/api/*` request to the backend.
+`HISTOAI_API_URL` must point at a running backend, for example a local FastAPI
+server exposed with Cloudflare Tunnel:
 
-> **Large slides:** the Pages Function buffers the upload, so multi-GB WSIs
-> can hit Cloudflare's request-size limit. For those, set the **API base URL**
-> field to your backend directly to bypass the CF proxy.
+```bash
+cd backend
+uvicorn main:app --host 0.0.0.0 --port 8000
+cloudflared tunnel --url http://localhost:8000
+```
+
+Paste the tunnel URL into `HISTOAI_API_URL`, then upload a slide and run
+analysis. If you are using the direct backend URL in the app UI instead, the
+same Cloudflare secret still gets injected server-side when requests pass
+through Pages.
 
 ---
 
